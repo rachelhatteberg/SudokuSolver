@@ -6,45 +6,35 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
+/**
+ * Solver class which provides a multi-faceted sudoku solving mechanism for all
+ * ranges of difficulty from easy to evil. This class can be broken into two
+ * main parts: the huristic solver and the recursive, brute force solver. For
+ * easy puzzles, the huristic solver is usually all that is needed to solve the
+ * problem; however, difficult and evil puzzles can be started using the
+ * huristic, but will need to be completed using a brute-force methodology.
+ *
+ * A mixed approach was implemented for personal enjoyment in trying to apply
+ * personal solving techniques into this algorithm, but with the understanding
+ * that I lack understanding of how to humanly solve such a difficult problem,
+ * brute force is needed to finish the job.
+ *
+ * A test case is provided if you run the main method. This makes it easier so
+ * you don't have to expend effort typing in all of the numbers into the gui
+ * multiple times.
+ *
+ * @author Rachel Hatteberg, S02633540
+ * @version 1.0, 04/27/2020 CSC-241 Student Project
+ */
 public class Solver {
 
 	public static void main(String[] args) {
+		/* for testing only... */
 
-		/*Tile ti = new Tile(0,0,0,0);
-		List<Integer> initialPossibilities = new ArrayList<Integer>(
-	            Arrays.asList(1,2,6,7,8,9));
-		ti.setPossibilities(initialPossibilities );
-		System.out.println(ti);
-		try
-		{
-		Tile mmk = (Tile)ti.clone();
-		List<Integer> ayyy = new ArrayList<Integer>(
-	            Arrays.asList(1,2));
-		mmk.setPossibilities(ayyy);
-		System.out.println(ti);
-		}
-		catch(Exception e)
-		{
-		}
-
-		System.exit(1);*/
-
-
-		/*
-		 * int[] testi =
-		 * {0,0,1,1,1,1,1,2,2,3,3,3,3,4,4,4,4,4,5,5,5,5,6,6,7,7,7,7,7,8,8}; int[] testj
-		 * = {1,4,2,4,6,7,8,2,5,1,3,6,8,0,3,4,5,8,0,2,5,7,3,6,0,1,2,4,6,4,7}; int[]
-		 * testv = {1,5,3,1,6,5,9,6,4,6,1,5,8,9,3,8,5,6,1,5,6,2,8,3,6,2,7,3,8,4,6};
-		 */
-
-		// evil below
+		/* evil sudoku test case */
 		int[] testi = { 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 3, 3, 3, 5, 5, 5, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8 };
 		int[] testj = { 2, 3, 5, 0, 2, 3, 4, 5, 0, 6, 0, 1, 6, 2, 7, 8, 2, 8, 3, 4, 5, 6, 8, 3, 5, 6 };
 		int[] testv = { 8, 5, 1, 7, 5, 6, 8, 9, 2, 5, 9, 5, 1, 7, 8, 4, 4, 1, 1, 9, 2, 3, 7, 7, 4, 8 };
-
-		// int[] testj = {7,5,6,7,8,3,4,7,8,0,2,7,3,5,1,6,8,0,1,4,5,0,1,2,3,1};
-		// int[] testi = {0,1,1,1,1,2,2,2,2,3,3,3,4,4,5,5,5,6,6,6,6,7,7,7,7,8};
-		// int[] testv = {4,6,1,8,9,9,5,3,7,3,2,6,6,2,4,3,8,4,8,9,7,9,7,3,1,1};
 
 		Board board = new Board();
 		for (int i = 0; i < testi.length; i++) {
@@ -55,20 +45,168 @@ public class Solver {
 		try {
 			Board resultBoard = huristicSolver(board);
 			Tile t = findNextTile(resultBoard);
-			System.out.println(resultBoard);
-			Board finalBoard = recursiveBruteForce(resultBoard, t, t.getPossibilities().remove(0));
+			Integer nextPos = t.getPossibilities().remove(0);
+			if (nextPos == null) {
+				throw new SolverException(NO_SOLUTION_WARNING);
+			}
+			Board finalBoard = recursiveBruteForce(resultBoard, t, nextPos);
 			System.out.println(finalBoard);
 		} catch (SolverException e) {
-			e.printStackTrace();
 		}
 	}
 
+	/**
+	 * int value for tiles without a value assigned to it.
+	 */
 	private static int MISSING_VALUE = -1;
+
+	/**
+	 * The sudoku board dimensions (9x9 grid).
+	 */
 	private static int BOARD_DIMENSIONS = 9;
 
+	/**
+	 * Message dialogue which will appear if there is no valid solution found.
+	 */
+	private static final String NO_SOLUTION_WARNING = "No valid solution found!";
+
+	/**
+	 * Message denoting unknown entity to evaluate.
+	 */
+	private static final String UNKNOWN_STRING = "Cannot determine what to evaluate";
+
+	/**
+	 * unique possibility in shared tiles' lists of possibilities.
+	 */
+	private static final int UNIQUE_POSSIBILITY = 1;
+
+	/**
+	 * there are no possibilities for the specified tile.
+	 */
+	private static final int NO_POSSIBILITIES = 0;
+
+	private static final List<Integer> RANGE = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9);
+
+	/**
+	 * high level solver method to call the huristic solver and, if needed, calls
+	 * the brute force recursive solver.
+	 *
+	 * @param board
+	 *            board being worked on
+	 * @return board completed board
+	 * @throws SolverException
+	 */
+	public static Board solve(Board board) throws SolverException {
+		/* Record the system time when the solver starts. */
+		Board finalBoard = null;
+		try {
+			Board resultBoard = huristicSolver(board);
+			if (resultBoard.isSolved())
+				return resultBoard;
+			Tile t = findNextTile(resultBoard);
+			System.out.println(resultBoard);
+			Integer nextPos = t.getPossibilities().remove(0);
+			if (nextPos == null) {
+				throw new SolverException(NO_SOLUTION_WARNING);
+			}
+			finalBoard = recursiveBruteForce(resultBoard, t, nextPos);
+			if (finalBoard == null)
+				throw new SolverException(NO_SOLUTION_WARNING);
+		} catch (IndexOutOfBoundsException e) {
+			throw new SolverException(NO_SOLUTION_WARNING);
+		}
+
+		return finalBoard;
+	}
+
+	/**
+	 * method to evaluate a board and try to find as many correct values to insert
+	 * into tiles as possible. This method uses human approaches to solving the
+	 * sudoku puzzle.
+	 *
+	 * @param board
+	 *            the initial board prior to being passed through the solver.
+	 * @return board an instance of the board after passed through the solver.
+	 * @throws SolverException
+	 */
+	public static Board huristicSolver(Board board) throws SolverException {
+		/*
+		 * flag will hold status of whether the huristic solver has been able to find
+		 * any new answers to be put into the board. The solver will continue until the
+		 * flag is set to false.
+		 */
+		boolean found = true;
+		while (found) {
+			found = false;
+			for (int i = 0; i < 9; i++) {
+				for (int j = 0; j < 9; j++) {
+					Tile curTile = board.getTile(i, j);
+					/* if curTile is empty, then we need to find a solution for it! */
+					if (curTile.getValue() == MISSING_VALUE) {
+						/* get all possibilities for the current tile */
+						List<Integer> possible = getPossibilities(board, curTile);
+						curTile.setPossibilities(possible);
+						if (possible.size() == NO_POSSIBILITIES) {
+							throw new SolverException(NO_SOLUTION_WARNING);
+						}
+						if (possible.size() == 1) {
+							found = true;
+							curTile.setValue((int) (possible.get(0)));
+							curTile.getPossibilities().remove(0);
+							break;
+						}
+					}
+				}
+			}
+
+			try {
+
+				/*
+				 * make successive calls to evaluate tiles by groups (i.e. row, column,
+				 * localgroup). These method calls are an attempt to huristically solve the
+				 * puzzle even further before moving on to the brute-force method.
+				 */
+
+				/*
+				 * if evaluateTileGroupNumbers returns true, leave found as true, otherwise
+				 * found remains original bool.
+				 */
+				found = evaluateTileGroupNumbers(board, "ROW") ? true : found;
+				found = evaluateTileGroupNumbers(board, "COLUMN") ? true : found;
+				found = evaluateTileGroupNumbers(board, "LG") ? true : found;
+
+			} catch (SolverException e) {
+				e.printStackTrace();
+			}
+		}
+		return board;
+	}
+
+	/**
+	 * method to evaluate tiles within individual group (i.e. row, column, local
+	 * group)
+	 *
+	 * @param board
+	 *            current board
+	 * @param str
+	 *            representation of which group to evaluate
+	 * @return true or false depending on whether a value was found for any number
+	 *         of tiles.
+	 * @throws SolverException
+	 */
 	public static boolean evaluateTileGroupNumbers(Board board, String str) throws SolverException {
 
+		/*
+		 * found flag will determine whether the huristic solver will continue
+		 * evaluating. first set to false, and will be set to true if a solution has
+		 * been found for any tile.
+		 */
 		boolean found = false;
+
+		/*
+		 * set method call to func if matches string parameter so we only have to call
+		 * the method we want.
+		 */
 		Function<Integer, List<Tile>> func;
 		switch (str) {
 		case "ROW":
@@ -81,12 +219,16 @@ public class Solver {
 			func = (Integer) -> board.getLocalGroupTiles(Integer);
 			break;
 		default:
-			throw new SolverException("Cannot determine what to evaluate");
+			throw new SolverException(UNKNOWN_STRING);
 		}
 
-		for (int i = 0; i < 9; i++) {
+		/*
+		 * loop over each tile in group being evaluated and find all of the
+		 * possibilities for each tile.
+		 */
+		for (int i = 0; i < BOARD_DIMENSIONS; i++) {
 			List<Tile> tileGroup = func.apply(i);
-			ArrayList<Integer> allPos = new ArrayList<Integer>();
+			ArrayList<Integer> allPos = new ArrayList<>();
 			for (Tile t : tileGroup) {
 				if (t.getValue() == MISSING_VALUE) {
 					List<Integer> possible = getPossibilities(board, t);
@@ -94,75 +236,127 @@ public class Solver {
 					allPos.addAll(t.getPossibilities());
 				}
 			}
+			/*
+			 * using lists of possibilities for each tile, evaluate whether any tile has a
+			 * unique possibility, if so, set the possibility/value to the tile. Last,
+			 * remove the possibility from the other shared tiles' lists of possibilities.
+			 */
 			for (Tile t : tileGroup) {
 				if (t.getValue() == MISSING_VALUE) {
 					for (Integer poss : t.getPossibilities()) {
 						int occurrences = Collections.frequency(allPos, poss);
-						/* found something */
-						if (occurrences == 1) {
-							//System.out.println("found something " + t);
+						/*
+						 * found a unique possibility amongst shared tiles' lists. set that value to the
+						 * tile.
+						 */
+						if (occurrences == UNIQUE_POSSIBILITY) {
 							t.setValue((int) (poss));
+							t.setPossibilities(new ArrayList<>());
+							/* set found flag to true since we found something */
 							found = true;
 							List<Tile> shared = getAllSharedTiles(board, t);
+							/*
+							 * remove the set value from the shared tiles' lists of possibilities.
+							 */
 							removePossibility(shared, (int) (poss));
-							//System.out.println(board);
 							break;
 						}
 					}
 				}
 			}
 		}
+		/* did we find anything? */
 		return found;
 	}
 
-	public static Board huristicSolver(Board board) throws SolverException {
-		boolean found = true;
-		while (found) {
-			found = false;
-			for (int i = 0; i < 9; i++) {
-				for (int j = 0; j < 9; j++) {
-					Tile curTile = board.getTile(i, j);
-					if (curTile.getValue() == MISSING_VALUE) {
-						List<Integer> possible = getPossibilities(board, curTile);
-						curTile.setPossibilities(possible);
-						if (possible.size() == 0) {
-							//System.out.println(curTile);
-							throw new SolverException("no solution!");
-						}
-						if (possible.size() == 1) {
-							//System.out.println("found something" + i + " " + j);
-							found = true;
-							curTile.setValue((int) (possible.get(0)));
-							//System.out.println(board);
-							break;
-						}
-					}
-				}
-			}
-
-			try {
-
-				// if evaluateTileGroupNumbers() returns true, leave found as true,
-				// otherwise found remains original value
-				found = evaluateTileGroupNumbers(board, "ROW") ? true : found;
-				found = evaluateTileGroupNumbers(board, "COLUMN") ? true : found;
-				found = evaluateTileGroupNumbers(board, "LG") ? true : found;
-
-			} catch (SolverException e) {
-				e.printStackTrace();
-			}
-
+	/**
+	 * Recursive method to finish solving the sudoku puzzle at hand. The method
+	 * accepts an instance of the current sudoku board, the current tile being
+	 * worked on, and a single possibility of which the tile's value will try to be
+	 * set with. The methodology of this solver is to set a possible value to a tile
+	 * and pass the updated board back into the huristic solver and see if the
+	 * huristic solver can find a solution. If not, then it backtracks to the
+	 * original board and tries setting the next possibility to the tile and trying
+	 * again until a solution is found.
+	 *
+	 * @param board
+	 *            current instance of board
+	 * @param tile
+	 *            current tile being worked on
+	 * @param poss
+	 *            possible value which is being set to the tile
+	 *
+	 * @return an instance of the Board
+	 * @throws SolverException
+	 */
+	public static Board recursiveBruteForce(Board board, Tile tile, Integer poss) throws SolverException {
+		/* make clone of board */
+		Board attemptedBoard = null;
+		try {
+			attemptedBoard = (Board) board.clone();
+		} catch (CloneNotSupportedException e1) {
+			e1.printStackTrace();
 		}
-		return board;
+		/*
+		 * start attempting to solve the remaining puzzle by setting a possible value
+		 * poss to attempted board and try passing newly updated board into the huristic
+		 * solver.
+		 */
+		attemptedBoard.setValue(tile.getX(), tile.getY(), poss);
+
+		try {
+			/*
+			 * enter into huristic solver with setting tile to be first element in poss
+			 */
+			attemptedBoard = huristicSolver(attemptedBoard);
+
+			/* huristicSolver will return a SolverException if a dead end was found */
+		} catch (SolverException e) {
+			if (tile.getPossibilities().size() == NO_POSSIBILITIES) {
+				throw new SolverException("test");
+			} else {
+				Integer nextPos = tile.getPossibilities().remove(0);
+				return recursiveBruteForce(board, tile, nextPos);
+			}
+		}
+		/* check whether the board has been solved or not before continuing */
+		if (!attemptedBoard.isSolved()) {
+			Tile newtile = findNextTile(attemptedBoard, tile);
+			try {
+				/* recursive call with next tile and a possibility to try */
+				return recursiveBruteForce(attemptedBoard, newtile, newtile.getPossibilities().remove(0));
+			} catch (SolverException e) {
+				/*
+				 * attempt recursive method call again by backtracking to original board and
+				 * tile and try the next possibility in the list of possibilities.
+				 */
+				return recursiveBruteForce(board, tile, tile.getPossibilities().remove(0));
+			}
+		}
+		return attemptedBoard;
 	}
 
+	/**
+	 * method to retrieve a list of tiles connected to a specific tile. More
+	 * specifically, it will return the row, column, and local group that the tile
+	 * is associated with.
+	 *
+	 * @param board
+	 *            current board being worked on
+	 * @param tile
+	 *            current tile being evaluated
+	 * @return tile list list of shared tiles among the rows, columns, and local
+	 *         groups
+	 */
 	public static List<Tile> getAllSharedTiles(Board board, Tile tile) {
-		List<Tile> allSharedTiles = new ArrayList();
+		List<Tile> allSharedTiles = new ArrayList<>();
 
+		/* get row, column, and local group tiles */
 		List<Tile> rowTiles = board.getRowTiles(tile.getX());
 		List<Tile> colTiles = board.getColTiles(tile.getY());
 		List<Tile> lgTiles = board.getLocalGroupTiles(tile.getLocalGroup());
 
+		/* add rows, columns, local group tiles into one shared list */
 		allSharedTiles.addAll(rowTiles);
 		allSharedTiles.addAll(colTiles);
 		allSharedTiles.addAll(lgTiles);
@@ -170,128 +364,89 @@ public class Solver {
 		return allSharedTiles;
 	}
 
+	/**
+	 * method to remove a possibility from a tile's list of possibilities. This
+	 * prevents duplicate values from being added to a row, column, or local group.
+	 *
+	 * @param tiles
+	 *            list of tiles of which a possibility is being removed from
+	 * @param poss
+	 *            value being removed from the tiles' lists of possibilities
+	 */
 	public static void removePossibility(List<Tile> tiles, int poss) {
 		for (Tile t : tiles) {
 			List<Integer> posses = t.getPossibilities();
-			if (posses.contains(poss)) {
+			/*
+			 * only remove a possibility from a tile's list of possibilities if the tile
+			 * does not have a set value.
+			 */
+			if (posses.contains(poss) && t.getValue() == MISSING_VALUE) {
 				t.getPossibilities().remove(new Integer(poss));
 			}
 		}
 	}
 
+	/**
+	 * getter method to return a list of possibilities for a tile.
+	 *
+	 * @param board
+	 *            board being worked on
+	 * @param tile
+	 *            current tile being evaluated
+	 * @return list of Integers
+	 */
 	public static List<Integer> getPossibilities(Board board, Tile tile) {
-		List<Integer> initialPossibilities = new ArrayList<Integer>(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9));
+		/* set initial possibilities to be all values from 1 -9 in board */
+		List<Integer> initialPossibilities = new ArrayList<>(RANGE);
 		List<Tile> rowTiles = board.getRowTiles(tile.getX());
 		List<Tile> colTiles = board.getColTiles(tile.getY());
-		List<Tile> allSharedTiles = new ArrayList<Tile>(rowTiles);
+		/* combine all shared tiles into one list */
+		List<Tile> allSharedTiles = new ArrayList<>(rowTiles);
 		allSharedTiles.addAll(colTiles);
 		allSharedTiles.addAll(board.getLocalGroupTiles(tile.getLocalGroup()));
 		for (Tile t : allSharedTiles) {
 			initialPossibilities.remove(new Integer(t.getValue()));
 		}
-
-		// board.getGetColTiles(tile.getY())
 		return initialPossibilities;
 	}
 
-	public static Board solve(Board board)
-	{
-		Board finalBoard = null;
-		try {
-			Board resultBoard = huristicSolver(board);
-			Tile t = findNextTile(resultBoard);
-			System.out.println(resultBoard);
-			finalBoard = recursiveBruteForce(resultBoard, t, t.getPossibilities().remove(0));
-			System.out.println(finalBoard);
-		} catch (SolverException e) {
-			e.printStackTrace();
-		}
-
-		return finalBoard;
+	/**
+	 * method to find the next tile which should be evaluated. called upon initial
+	 * solving, and don't need to compare to current tile.
+	 *
+	 * @param board
+	 *            board being evaluated
+	 * @return tile next tile to evaluate
+	 */
+	public static Tile findNextTile(Board board) {
+		return findNextTile(board, null);
 	}
 
 	/**
-	 * Recursive method to finish solving the sudoku puzzle at hand. The method
-	 * accepts an instance of the current sudoku board, an Integer ..
 	 *
-	 * @param board,
-	 *            i
-	 * @return an instance of the Board
+	 * overloaded findNextTile method accepting an additional parameter, tile, which
+	 * will allow us to compare our "next" tile to the current tile and make sure we
+	 * aren't going to attempt to process the same tile again.
+	 *
+	 * @param board
+	 *            board being evaluated
+	 * @param tile
+	 *            tile being evaluated
+	 * @return tile next tile to be evaluated
 	 */
-	// public Board recursiveBruteForce(Board board, Tile tile, List<Integer> poss)
-	public static Board recursiveBruteForce(Board board, Tile tile, Integer poss) {
-		// at a specific tile, get possibilities, and try solving with first possibility
-		// in list.
-		// if no solution, then remove possibility from list and try solving with the
-		// next
+	public static Tile findNextTile(Board board, Tile tile) {
 
-		// try with this tile and poss, and continue trying to solve until get a div/0
-		// exception
-
-		// make clone of board
-		Board attemptedBoard = null;
-		try {
-			attemptedBoard = (Board) board.clone();
-		} catch (CloneNotSupportedException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		attemptedBoard.setValue(tile.getX(), tile.getY(), poss);
-		System.out.println("tile : " + tile);
-		/* first check if the sudoku has been solved */
-		// while (!attemptedBoard.isSolved()) {
-		try {
-			/* call huristic solver with setting tile to be first element in poss */
-			System.out.println("calling Huristic");
-			attemptedBoard = huristicSolver(attemptedBoard);
-
-		} catch (SolverException e) {
-			// call recursiveBruteForce(board, tile, poss.remove(0)); with new poss, and new
-			// tile if no more poss
-			// if no solution, make recursive call with original board, same tile and one
-			// less poss in list
-			// tile.getPossibilities().remove(0) returns the first element in the
-			// possibilities List
-			System.out.println("divide by 0");
-			System.out.println("original** board ");
-			System.out.println(board);
-			System.out.println(tile);
-			Integer nextPos = tile.getPossibilities().remove(0);
-			System.out.println("nextPos: "+nextPos);
-			return recursiveBruteForce(board, tile, nextPos);
-
-		}
-		if (!attemptedBoard.isSolved()) {
-			System.out.println("Something worked");
-			System.out.println(board);
-			tile = findNextTile(board);
-			return recursiveBruteForce(board, tile, tile.getPossibilities().remove(0));
-		}
-
-		/* return completed board */
-		return attemptedBoard;
-
-	}
-
-	public boolean hasPossibilities(Tile tile) {
-		List<Integer> poss = new ArrayList<>();
-		// correct? or do i need to loop and add?
-		poss = tile.getPossibilities();
-		if (poss.size() == 0)
-			return false;
-		return false;
-	}
-
-	public static Tile findNextTile(Board board) {
-
-		// TODO find tile that is not -1 and is not itself
+		// find tile that is empty and is not itself
 		for (int i = 0; i < BOARD_DIMENSIONS; i++) {
 			for (int j = 0; j < BOARD_DIMENSIONS; j++) {
-				if (board.getTile(i, j).getValue() == MISSING_VALUE)
-					return board.getTile(i, j);
+				Tile curTile = board.getTile(i, j);
+				if (curTile.getValue() == MISSING_VALUE)
+					if ((tile == null) || (tile != curTile)) {
+						return curTile;
+					}
 			}
 		}
 		return null;
-
 	}
+
 }
