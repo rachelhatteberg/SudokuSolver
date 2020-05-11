@@ -9,51 +9,20 @@ import java.util.function.Function;
 /**
  * Solver class which provides a multi-faceted sudoku solving mechanism for all
  * ranges of difficulty from easy to evil. This class can be broken into two
- * main parts: the huristic solver and the recursive, brute force solver. For
- * easy puzzles, the huristic solver is usually all that is needed to solve the
+ * main parts: the heuristic solver and the recursive, brute force solver. For
+ * easy puzzles, the heuristic solver is usually all that is needed to solve the
  * problem; however, difficult and evil puzzles can be started using the
- * huristic, but will need to be completed using a brute-force methodology.
+ * heuristic, but will need to be completed using a brute-force methodology.
  *
  * A mixed approach was implemented for personal enjoyment in trying to apply
  * personal solving techniques into this algorithm, but with the understanding
  * that I lack understanding of how to humanly solve such a difficult problem,
  * brute force is needed to finish the job.
  *
- * A test case is provided if you run the main method. This makes it easier so
- * you don't have to expend effort typing in all of the numbers into the gui
- * multiple times.
- *
  * @author Rachel Hatteberg, S02633540
  * @version 1.0, 04/27/2020 CSC-241 Student Project
  */
 public class Solver {
-
-	public static void main(String[] args) {
-		/* for testing only... */
-
-		/* evil sudoku test case */
-		int[] testi = { 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 3, 3, 3, 5, 5, 5, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8 };
-		int[] testj = { 2, 3, 5, 0, 2, 3, 4, 5, 0, 6, 0, 1, 6, 2, 7, 8, 2, 8, 3, 4, 5, 6, 8, 3, 5, 6 };
-		int[] testv = { 8, 5, 1, 7, 5, 6, 8, 9, 2, 5, 9, 5, 1, 7, 8, 4, 4, 1, 1, 9, 2, 3, 7, 7, 4, 8 };
-
-		Board board = new Board();
-		for (int i = 0; i < testi.length; i++) {
-			board.setValue(testi[i], testj[i], testv[i]);
-		}
-		System.out.println(board);
-
-		try {
-			Board resultBoard = huristicSolver(board);
-			Tile t = findNextTile(resultBoard);
-			Integer nextPos = t.getPossibilities().remove(0);
-			if (nextPos == null) {
-				throw new SolverException(NO_SOLUTION_WARNING);
-			}
-			Board finalBoard = recursiveBruteForce(resultBoard, t, nextPos);
-			System.out.println(finalBoard);
-		} catch (SolverException e) {
-		}
-	}
 
 	/**
 	 * int value for tiles without a value assigned to it.
@@ -85,10 +54,28 @@ public class Solver {
 	 */
 	private static final int NO_POSSIBILITIES = 0;
 
+	/**
+	 * range of values from 1 to 9
+	 */
 	private static final List<Integer> RANGE = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9);
 
 	/**
-	 * high level solver method to call the huristic solver and, if needed, calls
+	 * String representation of ROW
+	 */
+	private static final String ROW = "ROW";
+
+	/**
+	 * String representation of ROW
+	 */
+	private static final String COLUMN = "COLUMN";
+
+	/**
+	 * String representation of LOCAL_GROUP
+	 */
+	private static final String LOCAL_GROUP = "LG";
+
+	/**
+	 * high level solver method to call the heuristic solver and, if needed, calls
 	 * the brute force recursive solver.
 	 *
 	 * @param board
@@ -100,7 +87,7 @@ public class Solver {
 		/* Record the system time when the solver starts. */
 		Board finalBoard = null;
 		try {
-			Board resultBoard = huristicSolver(board);
+			Board resultBoard = heuristicSolver(board);
 			if (resultBoard.isSolved())
 				return resultBoard;
 			Tile t = findNextTile(resultBoard);
@@ -129,17 +116,17 @@ public class Solver {
 	 * @return board an instance of the board after passed through the solver.
 	 * @throws SolverException
 	 */
-	public static Board huristicSolver(Board board) throws SolverException {
+	public static Board heuristicSolver(Board board) throws SolverException {
 		/*
-		 * flag will hold status of whether the huristic solver has been able to find
+		 * flag will hold status of whether the heuristic solver has been able to find
 		 * any new answers to be put into the board. The solver will continue until the
 		 * flag is set to false.
 		 */
 		boolean found = true;
 		while (found) {
 			found = false;
-			for (int i = 0; i < 9; i++) {
-				for (int j = 0; j < 9; j++) {
+			for (int i = 0; i < BOARD_DIMENSIONS; i++) {
+				for (int j = 0; j < BOARD_DIMENSIONS; j++) {
 					Tile curTile = board.getTile(i, j);
 					/* if curTile is empty, then we need to find a solution for it! */
 					if (curTile.getValue() == MISSING_VALUE) {
@@ -149,7 +136,11 @@ public class Solver {
 						if (possible.size() == NO_POSSIBILITIES) {
 							throw new SolverException(NO_SOLUTION_WARNING);
 						}
-						if (possible.size() == 1) {
+						/* if there is only one unique possibility in the list,
+						 * then set the value to the curTile and set the found flag
+						 * to true since we found something
+						 */
+						if (possible.size() == UNIQUE_POSSIBILITY) {
 							found = true;
 							curTile.setValue((int) (possible.get(0)));
 							curTile.getPossibilities().remove(0);
@@ -163,7 +154,7 @@ public class Solver {
 
 				/*
 				 * make successive calls to evaluate tiles by groups (i.e. row, column,
-				 * localgroup). These method calls are an attempt to huristically solve the
+				 * localgroup). These method calls are an attempt to heuristically solve the
 				 * puzzle even further before moving on to the brute-force method.
 				 */
 
@@ -171,9 +162,9 @@ public class Solver {
 				 * if evaluateTileGroupNumbers returns true, leave found as true, otherwise
 				 * found remains original bool.
 				 */
-				found = evaluateTileGroupNumbers(board, "ROW") ? true : found;
-				found = evaluateTileGroupNumbers(board, "COLUMN") ? true : found;
-				found = evaluateTileGroupNumbers(board, "LG") ? true : found;
+				found = evaluateTileGroupNumbers(board, ROW) ? true : found;
+				found = evaluateTileGroupNumbers(board, COLUMN) ? true : found;
+				found = evaluateTileGroupNumbers(board, LOCAL_GROUP) ? true : found;
 
 			} catch (SolverException e) {
 				e.printStackTrace();
@@ -197,7 +188,7 @@ public class Solver {
 	public static boolean evaluateTileGroupNumbers(Board board, String str) throws SolverException {
 
 		/*
-		 * found flag will determine whether the huristic solver will continue
+		 * found flag will determine whether the heuristic solver will continue
 		 * evaluating. first set to false, and will be set to true if a solution has
 		 * been found for any tile.
 		 */
@@ -209,13 +200,13 @@ public class Solver {
 		 */
 		Function<Integer, List<Tile>> func;
 		switch (str) {
-		case "ROW":
+		case ROW:
 			func = (Integer) -> board.getRowTiles(Integer);
 			break;
-		case "COLUMN":
+		case COLUMN:
 			func = (Integer) -> board.getColTiles(Integer);
 			break;
-		case "LG":
+		case LOCAL_GROUP:
 			func = (Integer) -> board.getLocalGroupTiles(Integer);
 			break;
 		default:
@@ -274,8 +265,8 @@ public class Solver {
 	 * accepts an instance of the current sudoku board, the current tile being
 	 * worked on, and a single possibility of which the tile's value will try to be
 	 * set with. The methodology of this solver is to set a possible value to a tile
-	 * and pass the updated board back into the huristic solver and see if the
-	 * huristic solver can find a solution. If not, then it backtracks to the
+	 * and pass the updated board back into the heuristic solver and see if the
+	 * heuristic solver can find a solution. If not, then it backtracks to the
 	 * original board and tries setting the next possibility to the tile and trying
 	 * again until a solution is found.
 	 *
@@ -299,18 +290,18 @@ public class Solver {
 		}
 		/*
 		 * start attempting to solve the remaining puzzle by setting a possible value
-		 * poss to attempted board and try passing newly updated board into the huristic
+		 * poss to attempted board and try passing newly updated board into the heuristic
 		 * solver.
 		 */
 		attemptedBoard.setValue(tile.getX(), tile.getY(), poss);
 
 		try {
 			/*
-			 * enter into huristic solver with setting tile to be first element in poss
+			 * enter into heuristic solver with setting tile to be first element in poss
 			 */
-			attemptedBoard = huristicSolver(attemptedBoard);
+			attemptedBoard = heuristicSolver(attemptedBoard);
 
-			/* huristicSolver will return a SolverException if a dead end was found */
+			/* heuristicSolver will return a SolverException if a dead end was found */
 		} catch (SolverException e) {
 			if (tile.getPossibilities().size() == NO_POSSIBILITIES) {
 				throw new SolverException("test");
